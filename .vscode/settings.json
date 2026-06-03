@@ -23,7 +23,7 @@
     },
     {
         "name": "ANTHROPIC_AUTH_TOKEN",
-        "value": "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"
+        "value": "placeholder_for_auth_token"
     }
 ],
 "claudeCode.useTerminal": true
