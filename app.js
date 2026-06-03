@@ -1,419 +1,154 @@
-// Liste des fichiers .md à charger
+// Minimal, focused behavior: central prompt, recent list, slide-over tokens, concise outputs
 const markdownFiles = [
-    'docs/CLAUDE.md',
-    'docs/ia-design/design-system.md',
-    'README.md',
-    'CONTRIBUTING.md'
+  'docs/CLAUDE.md',
+  'docs/ia-design/design-system.md',
+  'README.md'
 ];
 
-let currentFile = null;
-let fileContents = {};
-let tokenData = null;
-let componentsManifest = null;
-
-// Initialisation
-document.addEventListener('DOMContentLoaded', () => {
-    initFileList();
-    initTabs();
-    initButtons();
-    initAssets();
+document.addEventListener('DOMContentLoaded', ()=> {
+  initRecent();
+  bindUI();
+  preloadAssets();
 });
 
-// Initialiser la liste de fichiers
-function initFileList() {
-    const fileList = document.getElementById('fileList');
-    const fileSelect = document.getElementById('fileSelect');
-    
-    markdownFiles.forEach(file => {
-        // Sidebar
-        const li = document.createElement('li');
-        li.textContent = file.split('/').pop();
-        li.dataset.file = file;
-        li.addEventListener('click', () => loadFile(file, li));
-        fileList.appendChild(li);
-        
-        // Dropdown
-        const option = document.createElement('option');
-        option.value = file;
-        option.textContent = file;
-        fileSelect.appendChild(option);
+function initRecent(){
+  const recent = ['Créer landing page', 'Extraire tokens', 'Préparer handoff', 'Vérifier contrastes'];
+  const ul = document.getElementById('recentList');
+  recent.forEach(r=>{
+    const li = document.createElement('li');
+    li.textContent = r;
+    li.addEventListener('click', ()=> {
+      document.getElementById('prompt').value = r;
+      triggerAction(r);
     });
-    
-    fileSelect.addEventListener('change', (e) => {
-        if (e.target.value) {
-            const li = document.querySelector(`li[data-file="${e.target.value}"]`);
-            loadFile(e.target.value, li);
-        }
-    });
+    ul.appendChild(li);
+  });
 }
 
-async function initAssets() {
-    await Promise.all([
-        loadTokenFile(),
-        loadComponentsManifest()
+function bindUI(){
+  document.getElementById('analyzeBtn').addEventListener('click', ()=> {
+    document.getElementById('prompt').value = 'Analyse le design system et extrais les tokens principaux';
+    triggerAction('analyze');
+  });
+  document.getElementById('generateBtn').addEventListener('click', ()=> {
+    document.getElementById('prompt').value = 'Génère une page d\'accueil à partir des tokens et composants';
+    triggerAction('generate');
+  });
+  document.getElementById('plus').addEventListener('click', ()=> {
+    openPanel('quick-actions', 'Actions rapides');
+  });
+  document.getElementById('closePanel')?.addEventListener('click', ()=> closePanel());
+  document.getElementById('prompt').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') {
+      e.preventDefault();
+      const val = e.target.value.trim();
+      if(val) triggerAction(val);
+    }
+  });
+}
+
+async function preloadAssets(){
+  // load tokens and components if available (optional)
+  try{
+    const [t,c] = await Promise.all([
+      fetch('design-tokens.json').then(r=> r.ok ? r.json(): null).catch(()=>null),
+      fetch('components-manifest.json').then(r=> r.ok ? r.json(): null).catch(()=>null)
     ]);
-    renderTokenPanel();
-    renderComponentsPanel();
+    window.AGENT_TOKENS = t;
+    window.AGENT_COMPONENTS = c;
+  }catch(e){
+    console.warn('assets preloading failed', e);
+  }
 }
 
-async function loadTokenFile() {
-    try {
-        const response = await fetch('design-tokens.json');
-        if (!response.ok) throw new Error('design-tokens.json non trouvé');
-        tokenData = await response.json();
-        applyDesignTokens(tokenData.colors || {});
-    } catch (error) {
-        console.warn('Impossible de charger design-tokens.json', error);
+function openPanel(kind, title){
+  const panel = document.getElementById('panel');
+  panel.classList.remove('hidden');
+  panel.setAttribute('aria-hidden','false');
+  document.getElementById('panelTitle').textContent = title;
+  const body = document.getElementById('panelBody');
+  body.innerHTML = '';
+
+  if(kind === 'quick-actions'){
+    body.innerHTML = `<p style="color:#6b7280;margin-bottom:12px">Actions rapides pour automatiser ton design workflow</p>
+      <button class="cta" onclick="triggerAction('analyze')">Analyser le DS</button>
+      <button class="cta ghost" style="margin-left:8px" onclick="triggerAction('generate')">Générer page</button>
+      <div style="height:12px"></div>
+      <button class="cta ghost" onclick="triggerAction('handoff')">Préparer handoff</button>`;
+    return;
+  }
+
+  if(kind === 'tokens') {
+    const t = window.AGENT_TOKENS;
+    if(!t) return body.innerHTML = '<p style="color:#6b7280">Aucun token trouvé</p>';
+    const rows = Object.entries(t.colors||{}).map(([k,v]) => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div style="width:28px;height:20px;background:${v};border-radius:6px;border:1px solid rgba(0,0,0,0.06)"></div><div style="flex:1">${k}</div><code style="color:#6b7280">${v}</code></div>`).join('');
+    body.innerHTML = `<h4>Couleurs</h4>${rows}`;
+    return;
+  }
+
+  // default: show components
+  const comps = (window.AGENT_COMPONENTS && window.AGENT_COMPONENTS.components) || [];
+  if(comps.length === 0) body.innerHTML = '<p style="color:#6b7280">Aucun composant détecté</p>';
+  else {
+    body.innerHTML = comps.map(c => `<div style="padding:10px;border-radius:8px;background:#fff;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><div style="font-weight:600;color:#0b1220">${c.name}</div><div style="font-size:12px;color:#6b7280">${c.type}</div></div>`).join('');
+  }
+}
+
+function closePanel(){
+  const panel = document.getElementById('panel');
+  panel.classList.add('hidden');
+  panel.setAttribute('aria-hidden','true');
+}
+
+function renderResult(title, bodyHtml){
+  const results = document.getElementById('results');
+  results.classList.remove('hidden');
+  results.innerHTML = `<div class="card"><strong>${title}</strong><div style="margin-top:8px;color:#374151">${bodyHtml}</div></div>`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function triggerAction(input){
+  // normalize common actions
+  const q = (input||'').toLowerCase();
+  if(q.includes('analy') || q.includes('token')){
+    // local extraction if tokens loaded
+    if(window.AGENT_TOKENS){
+      const t = window.AGENT_TOKENS;
+      const summary = Object.entries(t.colors||{}).slice(0,6).map(([k,v])=>`<div style="display:flex;justify-content:space-between"><span>${k}</span><code style="color:#6b7280">${v}</code></div>`).join('');
+      renderResult('Design tokens (extrait)', summary + `<div style="margin-top:12px"><button class="cta ghost" onclick="openPanel('tokens','Tokens')">Voir tous les tokens</button></div>`);
+      return;
     }
+    renderResult('Analyse', 'Aucun fichier tokens local. Clique sur "Analyser mon design system" pour extraire les tokens depuis Figma/Docs.');
+    return;
+  }
+
+  if(q.includes('gener') || q.includes('page') || q.includes('landing')){
+    // create a simple HD-ready UI snippet using tokens if available
+    const tokens = window.AGENT_TOKENS ? window.AGENT_TOKENS.colors : null;
+    const primary = tokens?.primary || '#ff7900';
+    const html = `
+      <div style="padding:12px;border-radius:8px;background:linear-gradient(180deg,rgba(255,121,0,0.06),transparent);">
+        <div style="font-weight:700;margin-bottom:6px">Landing prototype</div>
+        <div style="color:#374151">Hero with title, subtitle and CTA using primary color</div>
+        <div style="margin-top:10px"><pre style="background:#fff;padding:12px;border-radius:8px;color:#111"><code>&lt;button style="background:${primary};color:#fff;padding:10px 14px;border-radius:999px"&gt;Call to action&lt;/button&gt;</code></pre></div>
+      </div>`;
+    renderResult('Prototype généré', html + `<div style="margin-top:12px"><button class="cta" onclick="copySnippet()">Copier le snippet</button></div>`);
+    return;
+  }
+
+  if(q.includes('handoff')){
+    renderResult('Handoff', 'Génération du paquet handoff : liste composants + tokens + guide rapide (telechargeable). (Prototype local — connecte l’API pour générer le ZIP).');
+    return;
+  }
+
+  // default: echo short answer and suggest quick actions
+  renderResult('Réponse rapide', `<div>${escapeHtml(input)}</div><div style="margin-top:12px;display:flex;gap:8px"><button class="cta" onclick="triggerAction('analyze')">Analyser</button><button class="cta ghost" onclick="triggerAction('generate')">Générer</button></div>`);
 }
 
-async function loadComponentsManifest() {
-    try {
-        const response = await fetch('components-manifest.json');
-        if (!response.ok) throw new Error('components-manifest.json non trouvé');
-        componentsManifest = await response.json();
-    } catch (error) {
-        console.warn('Impossible de charger components-manifest.json', error);
-    }
+function copySnippet(){
+  // copy simplified snippet to clipboard
+  const txt = '<button class="btn-primary">Call to action</button>';
+  navigator.clipboard.writeText(txt).then(()=> alert('Snippet copié'));
 }
 
-function applyDesignTokens(colors) {
-    const root = document.documentElement;
-    Object.entries(colors).forEach(([key, value]) => {
-        if (!value) return;
-        root.style.setProperty(`--${key}`, value);
-    });
-
-    if (colors.primary) {
-        root.style.setProperty('--action-primary-bg', colors.primary);
-    }
-    if (colors['primary-hover']) {
-        root.style.setProperty('--action-primary-bg-hover', colors['primary-hover']);
-    }
-    if (colors['bg-primary']) {
-        root.style.setProperty('--surface-default', colors['bg-primary']);
-    }
-    if (colors['bg-secondary']) {
-        root.style.setProperty('--surface-muted', colors['bg-secondary']);
-    }
-    if (colors['bg-tertiary']) {
-        root.style.setProperty('--surface-elevated', colors['bg-tertiary']);
-    }
-    if (colors.border) {
-        root.style.setProperty('--border-color', colors.border);
-    }
-}
-
-function renderTokenPanel() {
-    const tokensPanel = document.getElementById('tokensPanel');
-    if (!tokensPanel) return;
-
-    if (!tokenData || !tokenData.colors) {
-        tokensPanel.innerHTML = '<p>Tokens non chargés.</p>';
-        return;
-    }
-
-    const tokenRows = Object.entries(tokenData.colors)
-        .map(([key, value]) => `
-            <div class="token-row">
-                <span>${key}</span>
-                <span class="token-color" style="background:${value}"></span>
-                <code>${value}</code>
-            </div>
-        `)
-        .join('');
-
-    tokensPanel.innerHTML = `<div class="token-list-grid">${tokenRows}</div>`;
-}
-
-function renderComponentsPanel() {
-    const componentsPanel = document.getElementById('componentsPanel');
-    if (!componentsPanel) return;
-
-    if (!componentsManifest || !Array.isArray(componentsManifest.components)) {
-        componentsPanel.innerHTML = '<p>Composants non chargés.</p>';
-        return;
-    }
-
-    const items = componentsManifest.components.slice(0, 8).map((component) => `
-        <div class="component-chip">${component.name}</div>
-    `).join('');
-
-    componentsPanel.innerHTML = `<div class="component-grid">${items}</div>`;
-}
-
-// Charger un fichier
-async function loadFile(file, liElement) {
-    try {
-        // Highlight actif
-        document.querySelectorAll('#fileList li').forEach(li => li.classList.remove('active'));
-        if (liElement) liElement.classList.add('active');
-        
-        // Charger le contenu
-        const response = await fetch(file);
-        if (!response.ok) throw new Error('Fichier non trouvé');
-        
-        const content = await response.text();
-        fileContents[file] = content;
-        currentFile = file;
-        
-        // Afficher le rendu Markdown
-        renderMarkdown(content);
-        
-    } catch (error) {
-        console.error('Erreur de chargement:', error);
-        document.getElementById('markdownContent').innerHTML = `
-            <div class="empty-state">
-                <h2>❌ Erreur</h2>
-                <p>Impossible de charger le fichier : ${file}</p>
-                <p>${error.message}</p>
-            </div>
-        `;
-    }
-}
-
-// Rendu Markdown
-function renderMarkdown(content) {
-    const rendered = marked.parse(content);
-    const contentDiv = document.getElementById('markdownContent');
-    const sourceDiv = document.getElementById('sourceContent');
-    
-    contentDiv.innerHTML = rendered;
-    sourceDiv.classList.add('hidden');
-    
-    // Surlignage syntaxique
-    document.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-    });
-}
-
-// Afficher le source
-function showSource() {
-    if (!currentFile || !fileContents[currentFile]) return;
-    
-    const contentDiv = document.getElementById('markdownContent');
-    const sourceDiv = document.getElementById('sourceContent');
-    const sourceCode = document.getElementById('sourceCode');
-    
-    contentDiv.classList.add('hidden');
-    sourceDiv.classList.remove('hidden');
-    sourceCode.textContent = fileContents[currentFile];
-}
-
-// Initialiser les onglets
-function initTabs() {
-    const tabs = document.querySelectorAll('.tab');
-    const contents = document.querySelectorAll('.tab-content');
-    
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabName = tab.dataset.tab;
-            
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.classList.remove('active'));
-            
-            tab.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
-        });
-    });
-}
-
-// Initialiser les boutons
-function initButtons() {
-    // Bouton rendu
-    document.getElementById('renderBtn').addEventListener('click', () => {
-        if (currentFile && fileContents[currentFile]) {
-            renderMarkdown(fileContents[currentFile]);
-        }
-    });
-    
-    // Bouton source
-    document.getElementById('sourceBtn').addEventListener('click', showSource);
-    
-    // Bouton lire tous les .md
-    document.getElementById('readAllBtn').addEventListener('click', async () => {
-        await readAllFiles();
-    });
-    
-    // Bouton résumer
-    document.getElementById('summarizeBtn').addEventListener('click', () => {
-        generateProjectSummary();
-    });
-    
-    // Bouton design tokens
-    document.getElementById('extractDesignBtn').addEventListener('click', () => {
-        extractDesignTokens();
-    });
-    
-    // Bouton générer résumé
-    document.getElementById('generateSummaryBtn').addEventListener('click', () => {
-        generateProjectSummary();
-    });
-    
-    // Chat
-    document.getElementById('sendBtn').addEventListener('click', sendMessage);
-    document.getElementById('chatInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-}
-
-// Lire tous les fichiers
-async function readAllFiles() {
-    const viewer = document.getElementById('viewer');
-    viewer.classList.add('active');
-    
-    let allContent = '# 📚 Tous les fichiers Markdown\n\n';
-    
-    for (const file of markdownFiles) {
-        try {
-            const response = await fetch(file);
-            if (response.ok) {
-                const content = await response.text();
-                fileContents[file] = content;
-                allContent += `## ${file}\n\n${content}\n\n---\n\n`;
-            }
-        } catch (error) {
-            allContent += `## ${file}\n\n*_Fichier non trouvé_*\n\n`;
-        }
-    }
-    
-    renderMarkdown(allContent);
-}
-
-// Générer résumé du projet
-function generateProjectSummary() {
-    const summary = `
-# 📋 Résumé du Projet - Exploration IA Design
-
-## 🎯 Objectif
-Ce projet explore la création d'un **Design System** avec des composants réutilisables, 
-des tokens de design et des patterns d'interface.
-
-## 📁 Structure
-- **docs/** : Documentation du projet
-- **docs/ia-design/** : Design System et tokens
-- **src/** : Source code (si présent)
-
-## 🎨 Design System
-Le design system inclut :
-- Palette de couleurs
-- Typographie
-- Espacement
-- Composants UI
-
-## 🚀 Prochaines étapes
-1. Extraire tous les design tokens
-2. Créer les composants de base
-3. Documenter les patterns d'utilisation
-4. Générer une interface de démonstration
-
-## 💡 Fonctionnalités de l'Agent IA
-- ✅ Lecture automatique des fichiers .md
-- ✅ Rendu Markdown avec syntax highlighting
-- ✅ Extraction de design tokens
-- ✅ Résumé du projet
-- ✅ Chat interactif
-    `;
-    
-    document.getElementById('summaryContent').innerHTML = marked.parse(summary);
-}
-
-// Extraire design tokens
-function extractDesignTokens() {
-    const summaryContent = document.getElementById('summaryContent');
-    if (!tokenData) {
-        summaryContent.innerHTML = '<div class="empty-state"><h2>⚠️ Tokens non chargés</h2><p>Le fichier design-tokens.json n’a pas pu être chargé.</p></div>';
-        document.querySelector('.tab[data-tab="summary"]').click();
-        return;
-    }
-
-    const colorRows = Object.entries(tokenData.colors || {}).map(([key, value]) => `
-        | ${key} | ${value} | `).join('\n');
-
-    const typographyRows = Object.entries(tokenData.typography?.scale || {}).map(([key, value]) => `
-        | ${key} | ${value} | `).join('\n');
-
-    const tokens = `
-# 🎨 Design Tokens Extraits
-
-## Couleurs
-| Nom | Valeur | Usage |
-|-----|--------|-------|
-${colorRows}
-
-## Typographie
-| Nom | Valeur | Usage |
-|-----|--------|-------|
-${typographyRows}
-`;
-
-    summaryContent.innerHTML = marked.parse(tokens);
-    document.querySelector('.tab[data-tab="summary"]').click();
-}
-
-// Envoyer message chat
-function sendMessage() {
-    const input = document.getElementById('chatInput');
-    const messages = document.getElementById('chatMessages');
-    const question = input.value.trim();
-    
-    if (!question) return;
-    
-    // Ajouter message utilisateur
-    const userMsg = `
-        <div class="message user">
-            <div class="message-avatar">👤</div>
-            <div class="message-content">
-                <p>${escapeHtml(question)}</p>
-            </div>
-        </div>
-    `;
-    messages.insertAdjacentHTML('beforeend', userMsg);
-    
-    input.value = '';
-    messages.scrollTop = messages.scrollHeight;
-    
-    // Réponse simulée (à remplacer par ton API IA)
-    setTimeout(() => {
-        const response = getAIResponse(question);
-        const assistantMsg = `
-            <div class="message assistant">
-                <div class="message-avatar">🤖</div>
-                <div class="message-content">
-                    <p>${response}</p>
-                </div>
-            </div>
-        `;
-        messages.insertAdjacentHTML('beforeend', assistantMsg);
-        messages.scrollTop = messages.scrollHeight;
-    }, 500);
-}
-
-// Réponse IA simulée
-function getAIResponse(question) {
-    const q = question.toLowerCase();
-    
-    if (q.includes('design') || q.includes('token')) {
-        return 'Je peux extraire les design tokens de ton projet. Clique sur "Extraire Design Tokens" dans les actions rapides !';
-    }
-    
-    if (q.includes('projet') || q.includes('objectif')) {
-        return 'Ce projet explore la création d\'un Design System avec composants, tokens et patterns. Clique sur le bouton "Résumer le projet" pour plus de détails.';
-    }
-    
-    if (q.includes('composant')) {
-        return 'Les composants sont définis dans docs/ia-design/design-system.md. Sélectionne ce fichier pour les voir.';
-    }
-    
-    return 'Je peux t\'aider à lire et analyser tes fichiers .md. Essaie les actions rapides ou sélectionne un fichier dans la sidebar !';
-}
-
-// Échapper HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+function escapeHtml(s){ return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');}
