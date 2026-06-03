@@ -8,12 +8,15 @@ const markdownFiles = [
 
 let currentFile = null;
 let fileContents = {};
+let tokenData = null;
+let componentsManifest = null;
 
 // Initialisation
 document.addEventListener('DOMContentLoaded', () => {
     initFileList();
     initTabs();
     initButtons();
+    initAssets();
 });
 
 // Initialiser la liste de fichiers
@@ -42,6 +45,101 @@ function initFileList() {
             loadFile(e.target.value, li);
         }
     });
+}
+
+async function initAssets() {
+    await Promise.all([
+        loadTokenFile(),
+        loadComponentsManifest()
+    ]);
+    renderTokenPanel();
+    renderComponentsPanel();
+}
+
+async function loadTokenFile() {
+    try {
+        const response = await fetch('design-tokens.json');
+        if (!response.ok) throw new Error('design-tokens.json non trouvé');
+        tokenData = await response.json();
+        applyDesignTokens(tokenData.colors || {});
+    } catch (error) {
+        console.warn('Impossible de charger design-tokens.json', error);
+    }
+}
+
+async function loadComponentsManifest() {
+    try {
+        const response = await fetch('components-manifest.json');
+        if (!response.ok) throw new Error('components-manifest.json non trouvé');
+        componentsManifest = await response.json();
+    } catch (error) {
+        console.warn('Impossible de charger components-manifest.json', error);
+    }
+}
+
+function applyDesignTokens(colors) {
+    const root = document.documentElement;
+    Object.entries(colors).forEach(([key, value]) => {
+        if (!value) return;
+        root.style.setProperty(`--${key}`, value);
+    });
+
+    if (colors.primary) {
+        root.style.setProperty('--action-primary-bg', colors.primary);
+    }
+    if (colors['primary-hover']) {
+        root.style.setProperty('--action-primary-bg-hover', colors['primary-hover']);
+    }
+    if (colors['bg-primary']) {
+        root.style.setProperty('--surface-default', colors['bg-primary']);
+    }
+    if (colors['bg-secondary']) {
+        root.style.setProperty('--surface-muted', colors['bg-secondary']);
+    }
+    if (colors['bg-tertiary']) {
+        root.style.setProperty('--surface-elevated', colors['bg-tertiary']);
+    }
+    if (colors.border) {
+        root.style.setProperty('--border-color', colors.border);
+    }
+}
+
+function renderTokenPanel() {
+    const tokensPanel = document.getElementById('tokensPanel');
+    if (!tokensPanel) return;
+
+    if (!tokenData || !tokenData.colors) {
+        tokensPanel.innerHTML = '<p>Tokens non chargés.</p>';
+        return;
+    }
+
+    const tokenRows = Object.entries(tokenData.colors)
+        .map(([key, value]) => `
+            <div class="token-row">
+                <span>${key}</span>
+                <span class="token-color" style="background:${value}"></span>
+                <code>${value}</code>
+            </div>
+        `)
+        .join('');
+
+    tokensPanel.innerHTML = `<div class="token-list-grid">${tokenRows}</div>`;
+}
+
+function renderComponentsPanel() {
+    const componentsPanel = document.getElementById('componentsPanel');
+    if (!componentsPanel) return;
+
+    if (!componentsManifest || !Array.isArray(componentsManifest.components)) {
+        componentsPanel.innerHTML = '<p>Composants non chargés.</p>';
+        return;
+    }
+
+    const items = componentsManifest.components.slice(0, 8).map((component) => `
+        <div class="component-chip">${component.name}</div>
+    `).join('');
+
+    componentsPanel.innerHTML = `<div class="component-grid">${items}</div>`;
 }
 
 // Charger un fichier
@@ -225,36 +323,34 @@ Le design system inclut :
 
 // Extraire design tokens
 function extractDesignTokens() {
-    // Ceci est un exemple - tu peux le personnaliser pour lire les vrais tokens
+    const summaryContent = document.getElementById('summaryContent');
+    if (!tokenData) {
+        summaryContent.innerHTML = '<div class="empty-state"><h2>⚠️ Tokens non chargés</h2><p>Le fichier design-tokens.json n’a pas pu être chargé.</p></div>';
+        document.querySelector('.tab[data-tab="summary"]').click();
+        return;
+    }
+
+    const colorRows = Object.entries(tokenData.colors || {}).map(([key, value]) => `
+        | ${key} | ${value} | `).join('\n');
+
+    const typographyRows = Object.entries(tokenData.typography?.scale || {}).map(([key, value]) => `
+        | ${key} | ${value} | `).join('\n');
+
     const tokens = `
 # 🎨 Design Tokens Extraits
 
 ## Couleurs
 | Nom | Valeur | Usage |
 |-----|--------|-------|
-| Primary | #6366f1 | Boutons, accents |
-| Background | #0f172a | Fond principal |
-| Text | #f1f5f9 | Texte principal |
+${colorRows}
 
-## Typography
+## Typographie
 | Nom | Valeur | Usage |
 |-----|--------|-------|
-| Font Family | -apple-system, sans-serif | Par défaut |
-| H1 | 2rem | Titres principaux |
-| H2 | 1.5rem | Titres secondaires |
+${typographyRows}
+`;
 
-## Spacing
-| Nom | Valeur | Usage |
-|-----|--------|-------|
-| xs | 4px | Micro-espacement |
-| sm | 8px | Petit espacement |
-| md | 16px | Espacement standard |
-| lg | 24px | Grand espacement |
-    `;
-    
-    document.getElementById('summaryContent').innerHTML = marked.parse(tokens);
-    
-    // Basculer vers l'onglet summary
+    summaryContent.innerHTML = marked.parse(tokens);
     document.querySelector('.tab[data-tab="summary"]').click();
 }
 
