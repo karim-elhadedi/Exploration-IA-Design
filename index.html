@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent IA Augmenté - Exploration Design System</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>🤖 Agent IA</h1>
+                <p class="subtitle">Exploration Design System</p>
+            </div>
+            
+            <div class="file-tree">
+                <h2>📁 Fichiers</h2>
+                <ul id="fileList"></ul>
+            </div>
+            
+            <div class="quick-actions">
+                <h2>⚡ Actions rapides</h2>
+                <button id="readAllBtn" class="btn btn-primary">
+                    📖 Lire tous les .md
+                </button>
+                <button id="summarizeBtn" class="btn btn-secondary">
+                    📝 Résumer le projet
+                </button>
+                <button id="extractDesignBtn" class="btn btn-secondary">
+                    🎨 Extraire Design Tokens
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Tab Navigation -->
+            <div class="tabs">
+                <button class="tab active" data-tab="viewer">📄 Visionneur</button>
+                <button class="tab" data-tab="chat">💬 Chat IA</button>
+                <button class="tab" data-tab="summary">📋 Résumé</button>
+            </div>
+
+            <!-- Viewer Tab -->
+            <div class="tab-content active" id="viewer">
+                <div class="viewer-header">
+                    <select id="fileSelect" class="file-dropdown">
+                        <option value="">Sélectionner un fichier...</option>
+                    </select>
+                    <div class="Viewer-actions">
+                        <button id="renderBtn" class="btn btn-small">🔄 Rendu</button>
+                        <button id="sourceBtn" class="btn btn-small">📝 Source</button>
+                    </div>
+                </div>
+                
+                <div class="content-area">
+                    <div id="markdownContent" class="markdown-body">
+                        <div class="empty-state">
+                            <h2>👋 Bienvenue dans l'Agent IA Augmenté</h2>
+                            <p>Sélectionne un fichier .md dans la sidebar pour commencer</p>
+                            <p>OU utilize les actions rapides pour analyser tout le projet</p>
+                        </div>
+                    </div>
+                    <pre id="sourceContent" class="source-code hidden"><code id="sourceCode"></code></pre>
+                </div>
+            </div>
+
+            <!-- Chat Tab -->
+            <div class="tab-content" id="chat">
+                <div class="chat-container">
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="message assistant">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <p>Bonjour ! Je suis ton agent IA augmenté. Je peux :</p>
+                                <ul>
+                                    <li>Lire et analyser tes fichiers .md</li>
+                                    <li>Extraire les design tokens</li>
+                                    <li>Résumer ton projet</li>
+                                    <li>Répondre à tes questions</li>
+                                </ul>
+                                <p>Comment puis-je t'aider ?</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-container">
+                        <textarea id="chatInput" placeholder="Pose ta question..." rows="2"></textarea>
+                        <button id="sendBtn" class="btn btn-primary">
+                            🔵 Envoyer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Tab -->
+            <div class="tab-content" id="summary">
+                <div class="summary-header">
+                    <h2>📋 Résumé du projet</h2>
+                    <button id="generateSummaryBtn" class="btn btn-primary">
+                        🔄 Générer le résumé
+                    </button>
+                </div>
+                <div id="summaryContent" class="markdown-body">
+                    <div class="empty-state">
+                        <p>Clique sur "Générer le résumé" pour obtenir une analyse complète du projet</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
