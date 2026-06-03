@@ -1,0 +1,30 @@
+{
+    "claudeCode.disableLoginPrompt": true,
+    "claudeCode.environmentVariables": [
+    {
+        "name": "ANTHROPIC_BASE_URL",
+        "value": "https://llmproxy.ai.orange"
+    },
+    {
+        "name": "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        "value": "vertex_ai/claude-opus-4-5"
+    },
+    {
+        "name": "ANTHROPIC_DEFAULT_SONNET_MODEL",
+        "value": "vertex_ai/claude-sonnet-4-5"
+    },
+    {
+        "name": "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+        "value": "vertex_ai/claude-haiku-4-5"
+    },
+    {
+        "name": "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS",
+        "value": "1"
+    },
+    {
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "value": "SET_LOCALLY_ONLY"
+    }
+]
+
+}
