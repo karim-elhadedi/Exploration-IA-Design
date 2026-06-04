@@ -20,6 +20,7 @@ Check all relevant items:
 - Handoff clarity
 - Eco-design sobriety
 - Explicit reporting of uncertainty or gaps
+- lorem
 
 ## Completion rule
 Do not present an output as final if major uncertainty, inconsistency, or design-system drift remains unreported.
